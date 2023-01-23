@@ -1,0 +1,90 @@
+_schema-version: '3.1'
+ID: riskmanagement
+version: 1.0.0
+description: A simple CAP project.
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npx -p @sap/cds-dk cds build --production
+modules:
+  - name: riskmanagement-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: '${default-url}'
+    requires:
+      - name: riskmanagement-db
+      - name: riskmanagement-auth
+      - name: riskmanagement-destination-service
+  - name: riskmanagement-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: riskmanagement-db
+      - name: riskmanagement-auth
+  - name: riskmanagement-approuter
+    type: nodejs
+    path: approuter
+    requires:
+      - name: riskmanagement-auth
+      - name: srv-api
+        group: destinations
+        properties:
+          forwardAuthToken: true
+          strictSSL: true
+          name: srv-binding
+          url: '~{srv-url}'
+      - name: riskmanagement-db
+    build-parameters:
+      requires:
+        - name: riskmanagement-app
+          artifacts:
+            - ./*
+          target-path: resources
+  - name: riskmanagement-app
+    type: html5
+    path: app
+    build-parameters:
+      supported-platforms: []
+resources:
+  - name: riskmanagement-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: riskmanagement-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: 'riskmanagement-${space}'
+        role-collections:
+          - name: 'RiskManager-${space}'
+            description: Manage Risks
+            role-template-references:
+              - $XSAPPNAME.RiskManager
+          - name: 'RiskViewer-${space}'
+            description: View Risks
+            role-template-references:
+              - $XSAPPNAME.RiskViewer
+        oauth2-configuration:
+          redirect-uris:
+            - https://7a56508btrial-dev-riskmanagement-approuter.cfapps.us10-001.hana.ondemand.com/login/callback
+  - name: riskmanagement-destination-service
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite

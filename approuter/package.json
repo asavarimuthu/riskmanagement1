@@ -1,0 +1,16 @@
+{
+  "name": "approuter",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node node_modules/@sap/approuter/approuter.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@sap/approuter": "^9.3.1"
+  },
+  "engines": {
+    "node": "^14.20.1"
+  }
+}
