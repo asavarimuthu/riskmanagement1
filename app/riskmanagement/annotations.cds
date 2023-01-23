@@ -13,7 +13,7 @@ using RiskService from '../../srv/risk-service';
  Value : descr
  }
  },
- SelectionFields : [prio],
+ SelectionFields : [owner],
  Identification : [{Value : title}],
  // Define the table columns
  LineItem : [
