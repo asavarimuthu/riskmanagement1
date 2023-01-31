@@ -23,7 +23,7 @@ modules:
           srv-url: '${default-url}'
     requires:
       - name: riskmanagement-db
-      - name: riskmanagement-auth
+      - name: riskmanagement-auth1
       - name: riskmanagement-destination-service
   - name: riskmanagement-db-deployer
     type: hdb
@@ -32,12 +32,12 @@ modules:
       buildpack: nodejs_buildpack
     requires:
       - name: riskmanagement-db
-      - name: riskmanagement-auth
+      - name: riskmanagement-auth1
   - name: riskmanagement-approuter
     type: nodejs
     path: approuter
     requires:
-      - name: riskmanagement-auth
+      - name: riskmanagement-auth1
       - name: srv-api
         group: destinations
         properties:
@@ -63,7 +63,7 @@ resources:
     parameters:
       service: hana
       service-plan: hdi-shared
-  - name: riskmanagement-auth
+  - name: riskmanagement-auth1
     type: org.cloudfoundry.managed-service
     parameters:
       service: xsuaa
