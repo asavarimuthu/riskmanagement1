@@ -1,0 +1,167 @@
+_schema-version: "3.1"
+ID: riskmanagement
+description: A simple Full StacK Fiori APP using SAP CAP Architecture.
+version: 1.0.0
+modules:
+  - name: riskmanagement-srv  #service module
+    type: nodejs
+    path: gen/srv
+    requires:
+      - name: riskmanagement-db
+      - name: riskmanagement-uaa
+      - name: riskmanagement-logging
+      - name: riskmanagement-dest
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}         
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+  - name: riskmanagement-app-content  #UI deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: riskmanagement-repo-host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - artifacts:
+            - riskmanagement.zip
+          name: riskmanagement
+          target-path: resources/
+      
+  - name: riskmanagement  #UI
+    type: html5
+    path: app/riskmanagement
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms: []
+  - name: riskmanagement-db-deployer  #HANA
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: riskmanagement-db
+      - name: riskmanagement-uaa
+  - name: riskmanagement-destination-content
+    type: com.sap.application.content
+    requires:
+    - name: riskmanagement-dest-srv
+      parameters:
+        content-target: true
+    - name: riskmanagement-repo-host
+      parameters:
+        service-key:
+          name: riskmanagement-repo-host-key
+    - name: riskmanagement-uaa
+      parameters:
+        service-key:
+          name: riskmanagement-uaa-key
+    parameters:
+      content:
+        instance:
+          destinations:
+          - Name: riskmanagement_repo_host
+            ServiceInstanceName: riskmanagement-html5-srv
+            ServiceKeyName: riskmanagement-host-key
+            sap.cloud.service: business.service
+          - Authentication: OAuth2UserTokenExchange
+            Name: riskmanagement_cap_uaa
+            ServiceInstanceName: riskmanagement-xsuaa-service
+            ServiceKeyName: riskmanagement-uaa-key
+            sap.cloud.service: business.service
+          existing_destinations_policy: update
+    build-parameters:
+      no-source: true
+resources:
+  - name: riskmanagement-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+    properties:
+      hdi-service-name: ${service-name}
+  - name: riskmanagement-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-name: riskmanagement-html5-srv
+      service-plan: app-host
+  - name: riskmanagement-dest-srv
+    type: org.cloudfoundry.managed-service
+    parameters:
+      config:
+        HTML5Runtime_enabled: false
+        init_data:
+          instance:
+            destinations:
+              - Authentication: NoAuthentication  
+                Name: riskmanagement-srv-api
+                ProxyType: Internet
+                Type: HTTP
+                URL: ~{srv-api/srv-url}
+                HTML5.ForwardAuthToken: true
+            existing_destinations_policy: update
+        version: 1.0.0
+      service: destination
+      service-name: riskmanagement-dest-srv
+      service-plan: lite
+    requires:
+      - name: srv-api
+  - name: riskmanagement-uaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service-plan: application
+      service-name: riskmanagement-xsuaa-service
+      service: xsuaa
+      path: ./xs-security.json
+      config:
+        xsappname: "riskmanagement-${space}"
+        tenant-mode: dedicated
+  # ---------------- APPLICATION LOGGING SERVICE ---------------
+  - name: riskmanagement-logging
+  # ------------------------------------------------------------
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: application-logs
+      service-plan: lite
+
+  # -------------------- DESTINATION SERVICE -------------------
+  - name: riskmanagement-dest
+    # ------------------------------------------------------------
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+      config:
+        init_data:
+          instance:
+              existing_destinations_policy: ignore
+              destinations:
+                - Name: riskmanagement-NASA-api
+                  Description: NASA APIs
+                  URL: https://api.nasa.gov
+                  Type: HTTP
+                  ProxyType: Internet
+                  Authentication: NoAuthentication
+                  HTML5.DynamicDestination: true
+  
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx -p @sap/cds-dk cds build --production
+#       - npx rimraf gen/db/src/gen/data # uncomment this line to prevent loading of initial data which is only relevant for dev/test deployments 
+#       - npx rimraf gen/db/src/gen/csv  # uncomment this line unless db/csv folder has been used for config/control table data which is entirely managed by the developer and never changed by the app

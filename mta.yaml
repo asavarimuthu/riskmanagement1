@@ -23,8 +23,34 @@ modules:
           srv-url: '${default-url}'
     requires:
       - name: riskmanagement-db
-      - name: riskmanagement-auth1
+      - name: riskmanagement-auth2
       - name: riskmanagement-destination-service
+  - name: riskmanagement-app-content  #UI deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: riskmanagement-repo-host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - artifacts:
+            - riskmanagement.zip
+          name: riskmanagement
+          target-path: resources/
+      
+  - name: riskmanagement  #UI
+    type: html5
+    path: app/riskmanagement
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms: []
+
   - name: riskmanagement-db-deployer
     type: hdb
     path: gen/db
@@ -32,12 +58,12 @@ modules:
       buildpack: nodejs_buildpack
     requires:
       - name: riskmanagement-db
-      - name: riskmanagement-auth1
+      - name: riskmanagement-auth2
   - name: riskmanagement-approuter
     type: nodejs
     path: approuter
     requires:
-      - name: riskmanagement-auth1
+      - name: riskmanagement-auth2
       - name: srv-api
         group: destinations
         properties:
@@ -63,7 +89,7 @@ resources:
     parameters:
       service: hana
       service-plan: hdi-shared
-  - name: riskmanagement-auth1
+  - name: riskmanagement-auth2
     type: org.cloudfoundry.managed-service
     parameters:
       service: xsuaa
@@ -88,3 +114,9 @@ resources:
     parameters:
       service: destination
       service-plan: lite
+  - name: riskmanagement-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-name: riskmanagement-html5-srv
+      service-plan: app-host
